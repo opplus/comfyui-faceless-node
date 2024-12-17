@@ -95,26 +95,28 @@ def get_face_analyser() -> Any:
     face_recognizer = None
 
     with THREAD_LOCK:
+        providers=apply_execution_provider_options(forceCuda=True)
+        # print(f"face analyser providers {providers}")
         if FACE_ANALYSER is None:
             if face_detector_model in [ 'many', 'retinaface' ]:
-                face_detectors['retinaface'] = onnxruntime.InferenceSession(MODELS['face_detector_retinaface']['path'], providers = apply_execution_provider_options())
+                face_detectors['retinaface'] = onnxruntime.InferenceSession(MODELS['face_detector_retinaface']['path'], providers = providers)
             if face_detector_model in [ 'many', 'scrfd' ]:
-                face_detectors['scrfd'] = onnxruntime.InferenceSession(MODELS['face_detector_scrfd']['path'], providers = apply_execution_provider_options())
+                face_detectors['scrfd'] = onnxruntime.InferenceSession(MODELS['face_detector_scrfd']['path'], providers = providers)
             if face_detector_model in [ 'many', 'yoloface' ]:
-                face_detectors['yoloface'] = onnxruntime.InferenceSession(MODELS['face_detector_yoloface']['path'], providers = apply_execution_provider_options())
+                face_detectors['yoloface'] = onnxruntime.InferenceSession(MODELS['face_detector_yoloface']['path'], providers = providers)
             if face_detector_model in [ 'yunet' ]:
                 face_detectors['yunet'] = cv2.FaceDetectorYN.create(MODELS['face_detector_yunet']['path'], '', (0, 0))
             if face_recognizer_model == 'arcface_blendswap':
-                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_blendswap']['path'], providers = apply_execution_provider_options())
+                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_blendswap']['path'], providers = providers)
             if face_recognizer_model == 'arcface_inswapper':
-                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_inswapper']['path'], providers = apply_execution_provider_options())
+                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_inswapper']['path'], providers = providers)
             if face_recognizer_model == 'arcface_simswap':
-                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_simswap']['path'], providers = apply_execution_provider_options())
+                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_simswap']['path'], providers = providers)
             if face_recognizer_model == 'arcface_uniface':
-                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_uniface']['path'], providers = apply_execution_provider_options())
-            face_landmarkers['68'] = onnxruntime.InferenceSession(MODELS['face_landmarker_68']['path'], providers = apply_execution_provider_options())
-            face_landmarkers['68_5'] = onnxruntime.InferenceSession(MODELS['face_landmarker_68_5']['path'], providers = apply_execution_provider_options())
-            gender_age = onnxruntime.InferenceSession(MODELS['gender_age']['path'], providers = apply_execution_provider_options())
+                face_recognizer = onnxruntime.InferenceSession(MODELS['face_recognizer_arcface_uniface']['path'], providers = providers)
+            face_landmarkers['68'] = onnxruntime.InferenceSession(MODELS['face_landmarker_68']['path'], providers = providers)
+            face_landmarkers['68_5'] = onnxruntime.InferenceSession(MODELS['face_landmarker_68_5']['path'], providers = providers)
+            gender_age = onnxruntime.InferenceSession(MODELS['gender_age']['path'], providers = providers)
             FACE_ANALYSER =\
             {
                 'face_detectors': face_detectors,
@@ -209,6 +211,7 @@ def detect_with_scrfd(vision_frame : VisionFrame, face_detector_size : str) -> T
 
 
 def detect_with_yoloface(vision_frame : VisionFrame, face_detector_size : str) -> Tuple[List[BoundingBox], List[FaceLandmark5], List[Score]]:
+    # print("detect_with_yoloface")
     face_detector = get_face_analyser().get('face_detectors').get('yoloface')
     face_detector_width, face_detector_height = unpack_resolution(face_detector_size)
     temp_vision_frame = resize_frame_resolution(vision_frame, (face_detector_width, face_detector_height))

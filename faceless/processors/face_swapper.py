@@ -8,9 +8,10 @@ import numpy
 import onnx
 from onnx import numpy_helper
 import onnxruntime
+import time
 
 from ..processors.face_analyser import get_average_face, get_many_faces, get_one_face
-from ..face_helper import warp_face_by_face_landmark_5, paste_back
+from ..face_helper import warp_face_by_face_landmark_5, paste_back,explode_pixel_boost, implode_pixel_boost
 from ..face_masker import create_static_box_mask, create_occlusion_mask, create_region_mask
 from ..execution import apply_execution_provider_options
 from ..typing import Embedding, Face, VisionFrame, FaceSelectorMode, ModelSet
@@ -97,11 +98,15 @@ class FaceSwapper:
 
         self._face_selector_mode: FaceSelectorMode = 'one'
 
-    def swap_images(self, images, face_image, output_path):
+    def swap_images(self, images, face_image, output_path,pixel_boost_size = (512,512)):
+        print(f"swap_images")
         source_frame = tensor_to_vision_frame(face_image)
         if source_frame is None:
             raise Exception('cannot read source image')
+        t0=time.time()
         source_face = get_average_face([source_frame])
+        t1=time.time()
+        print(f"swap_images get_average_face cost:{t1-t0}")
         if source_face is None:
             raise Exception('cannot find source face')
 
@@ -114,12 +119,14 @@ class FaceSwapper:
             target_vision_frame = tensor_to_vision_frame(target_image)
             if target_vision_frame is None:
                 raise Exception("invalid target image")
-            output_vision_frame = self._process_frame(source_face, source_frame, target_vision_frame)
+            output_vision_frame = self._process_frame(source_face, source_frame, target_vision_frame,pixel_boost_size)
+            print(f"swap_images _process_frame {index} cost:{time.time()-t1}")
+            t1=time.time()
             if output_vision_frame is None:
                 raise Exception("process frame failed")
             write_image(output_filepath, output_vision_frame)
 
-    def swap_video(self, source_image, target_frames_dir: str):
+    def swap_video(self, source_image, target_frames_dir: str,pixel_boost_size = (512,512)):
         frames_filenames = os.listdir(target_frames_dir)
         queue_payloads = sorted(frames_filenames)
         with ThreadPoolExecutor(max_workers = self._execution_thread_count) as executor:
@@ -127,16 +134,20 @@ class FaceSwapper:
             queue : Queue[str] = self._create_queue(queue_payloads)
             queue_per_future = max(len(queue_payloads) // self._execution_thread_count * self._execution_queue_count, 1)
             while not queue.empty():
-                future = executor.submit(self._process_frames, source_image, target_frames_dir, self._pick_queue(queue, queue_per_future))
+                future = executor.submit(self._process_frames, source_image, target_frames_dir, self._pick_queue(queue, queue_per_future),pixel_boost_size)
                 futures.append(future)
             for future_done in as_completed(futures):
                 future_done.result()
 
-    def _process_frames(self, source_image, target_frames_dir: str, queue_payloads: List[str]):
+    def _process_frames(self, source_image, target_frames_dir: str, queue_payloads: List[str],pixel_boost_size = (512,512)):
+        print(f"_process_frames")
         source_frame = tensor_to_vision_frame(source_image)
         if source_frame is None:
             raise Exception("cannot read source image")
+        t0=time.time()
         source_face = get_average_face([source_frame])
+        t1=time.time()
+        print(f"_process_frames get_average_face cost:{t1-t0}")
         if source_face is None:
             raise Exception("cannot find source face")
 
@@ -148,20 +159,22 @@ class FaceSwapper:
             target_vision_frame = read_image(frame_filepath)
             if target_vision_frame is None:
                 raise Exception("invalid target image")
-            output_vision_frame = self._process_frame(source_face, source_frame, target_vision_frame)
+            output_vision_frame = self._process_frame(source_face, source_frame, target_vision_frame,pixel_boost_size)
+            print(f"_process_frame {index} cost:{time.time()-t1}")
+            t1=time.time()
             if output_vision_frame is None:
                 raise Exception("process frame failed")
             write_image(frame_filepath, output_vision_frame)
 
-    def _process_frame(self, source_face: Face, source_vision_frame: VisionFrame, target_vision_frame: VisionFrame) -> Optional[VisionFrame]:
+    def _process_frame(self, source_face: Face, source_vision_frame: VisionFrame, target_vision_frame: VisionFrame,pixel_boost_size = (512,512)) -> Optional[VisionFrame]:
         if self._face_selector_mode == 'many':
             target_faces = get_many_faces(target_vision_frame)
             for target_face in target_faces:
-                target_vision_frame = self._swap_face(source_face, target_face, source_vision_frame, target_vision_frame)
+                target_vision_frame = self._swap_face(source_face, target_face, source_vision_frame, target_vision_frame,pixel_boost_size)
         if self._face_selector_mode == 'one':
             target_face = get_one_face(target_vision_frame)
             if target_face:
-                target_vision_frame = self._swap_face(source_face, target_face, source_vision_frame, target_vision_frame)
+                target_vision_frame = self._swap_face(source_face, target_face, source_vision_frame, target_vision_frame,pixel_boost_size)
         return target_vision_frame
 
     def _create_queue(self, queue_payloads: List[str]) -> Queue[str]:
@@ -191,24 +204,37 @@ class FaceSwapper:
                 model_path = get_faceless_model_path('face_swapper', self._model_name)
                 if model_path is None:
                     raise Exception("can not get model path")
-                self._frame_processor = onnxruntime.InferenceSession(model_path, providers = apply_execution_provider_options())
+                providers=apply_execution_provider_options(forceCuda=True)
+                print(f"apply_execution_provider_options {providers}")
+                self._frame_processor = onnxruntime.InferenceSession(model_path, providers = providers)
+                # self._frame_processor = insightface.model_zoo.get_model(model_path, providers=providers)
         return self._frame_processor
 
-    def _swap_face(self, source_face: Face, target_face: Face, source_vision_frame, target_vision_frame: VisionFrame) -> VisionFrame:
+    def _swap_face(self, source_face: Face, target_face: Face, source_vision_frame, target_vision_frame: VisionFrame,pixel_boost_size = (512,512)) -> VisionFrame:
         model_template = self._get_model_options().get('template')
         model_size = self._get_model_options().get('size')
-        crop_vision_frame, affine_matrix = warp_face_by_face_landmark_5(target_vision_frame, target_face.landmarks.get('5/68'), model_template, model_size)
+        print(pixel_boost_size)
+        pixel_boost_total = pixel_boost_size[0]//model_size[0]
+        crop_vision_frame, affine_matrix = warp_face_by_face_landmark_5(target_vision_frame,
+                                                                    target_face.landmarks.get('5/68'),
+                                                                    model_template, pixel_boost_size)
         crop_mask_list = []
-
+        temp_vision_frames = []
         if 'box' in self._face_mask_types:
             box_mask = create_static_box_mask(crop_vision_frame.shape[:2][::-1], self._face_mask_blur, self._face_mask_padding)
             crop_mask_list.append(box_mask)
         if 'occlusion' in self._face_mask_types:
             occlusion_mask = create_occlusion_mask(crop_vision_frame)
             crop_mask_list.append(occlusion_mask)
-        crop_vision_frame = self._prepare_crop_frame(crop_vision_frame)
-        crop_vision_frame = self._apply_swap(source_face, source_vision_frame, crop_vision_frame)
-        crop_vision_frame = self._normalize_crop_frame(crop_vision_frame)
+        t0=time.time()
+        pixel_boost_vision_frames = implode_pixel_boost(crop_vision_frame, pixel_boost_total, model_size)
+        for pixel_boost_vision_frame in pixel_boost_vision_frames:
+            pixel_boost_vision_frame = self._prepare_crop_frame(pixel_boost_vision_frame)
+            pixel_boost_vision_frame = self._apply_swap(source_face, source_vision_frame, pixel_boost_vision_frame)
+            pixel_boost_vision_frame = self._normalize_crop_frame(pixel_boost_vision_frame)
+            temp_vision_frames.append(pixel_boost_vision_frame)
+        crop_vision_frame = explode_pixel_boost(temp_vision_frames, pixel_boost_total, model_size, pixel_boost_size)
+        print(f"_apply_swap cost:{time.time()-t0}")
         if 'region' in self._face_mask_types:
             region_mask = create_region_mask(crop_vision_frame, self._face_mask_regions)
             crop_mask_list.append(region_mask)

@@ -7,9 +7,10 @@ from typing import List, Any
 
 from .typing import ValueAndUnit, ExecutionDevice
 
-def apply_execution_provider_options(execution_providers: List[str] | None = None) -> List[Any]:
+def apply_execution_provider_options(execution_providers: List[str] | None = None, forceCuda=False) -> List[Any]:
+    if forceCuda==True:
+        return ['CUDAExecutionProvider', 'CPUExecutionProvider']
     execution_providers_with_options : List[Any] = []
-
     if execution_providers is None:
         execution_providers = get_default_providers()
     for execution_provider in execution_providers:

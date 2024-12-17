@@ -51,8 +51,8 @@ class NodesFaceSwap:
         if os.path.exists(output_path):
             shutil.rmtree(output_path)
         os.makedirs(output_path)
-
-        swapper.swap_images(images, face_image[0], output_path)
+        pixel_boost_size = (512,512)
+        swapper.swap_images(images, face_image[0], output_path,pixel_boost_size)
         # process_images(image[0], face_image, output_path)
 
         images = []
