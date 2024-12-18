@@ -14,7 +14,7 @@ from ..face_helper import warp_face_by_face_landmark_5, paste_back, explode_pixe
 from ..face_masker import create_static_box_mask, create_occlusion_mask, create_region_mask
 from ..processors.face_analyser import get_average_face
 from ..processors.face_analyser import get_many_faces, get_one_face
-from ..typing import Face, VisionFrame
+from ..typing import Face, VisionFrame, Embedding
 from ..vision import tensor_to_vision_frame
 
 THREAD_LOCK: threading.Lock = threading.Lock()
@@ -37,6 +37,9 @@ def swap_multi_images(swapper, images, face_image, source_face: Face, pixel_boos
         target_vision_frame = tensor_to_vision_frame(target_image)
         target_vision_frames.append(target_vision_frame)
     exec_result = []
+    # 提前init
+    frame_processor = swapper._get_frame_processor()
+    _get_model_initializer = swapper._get_frame_processor()
     with ThreadPoolExecutor(max_workers=swapper._execution_thread_count) as executor:
         futures = [
             executor.submit(_process_frame_squence, swapper,i, source_face, source_frame, target_vision_frame,
@@ -84,7 +87,6 @@ def _swap_face(swapper, source_face: Face, target_face: Face, source_vision_fram
                                                                     target_face.landmarks.get('5/68'),
                                                                     model_template, pixel_boost_size)
     crop_mask_list = []
-    temp_vision_frames = []
     if 'box' in swapper._face_mask_types:
         box_mask = create_static_box_mask(crop_vision_frame.shape[:2][::-1], swapper._face_mask_blur,
                                           swapper._face_mask_padding)
@@ -92,6 +94,7 @@ def _swap_face(swapper, source_face: Face, target_face: Face, source_vision_fram
     if 'occlusion' in swapper._face_mask_types:
         occlusion_mask = create_occlusion_mask(crop_vision_frame)
         crop_mask_list.append(occlusion_mask)
+
     t0 = time.time()
     pixel_boost_vision_frames = implode_pixel_boost(crop_vision_frame, pixel_boost_total, model_size)
     exec_result = []
@@ -116,7 +119,10 @@ def _swap_face(swapper, source_face: Face, target_face: Face, source_vision_fram
 
 def _swap_face_sequence(swapper, idx, source_face: Face, source_vision_frame,
                  pixel_boost_vision_frame: VisionFrame) -> VisionFrame:
-    return idx, _apply_swap(swapper,source_face, source_vision_frame, pixel_boost_vision_frame)
+    pixel_boost_vision_frame = _prepare_crop_frame(swapper,pixel_boost_vision_frame)
+    pixel_boost_vision_frame = _apply_swap(swapper,source_face, source_vision_frame, pixel_boost_vision_frame)
+    pixel_boost_vision_frame = _normalize_crop_frame(pixel_boost_vision_frame)
+    return idx, pixel_boost_vision_frame
 
 
 def _apply_swap(swapper, source_face: Face, source_vision_frame: VisionFrame,
@@ -128,11 +134,47 @@ def _apply_swap(swapper, source_face: Face, source_vision_frame: VisionFrame,
     for frame_processor_input in frame_processor.get_inputs():
         if frame_processor_input.name == 'source':
             if model_type == 'blendswap' or model_type == 'uniface':
-                frame_processor_inputs[frame_processor_input.name] = swapper._prepare_source_frame(source_face,
-                                                                                                   source_vision_frame)
+                frame_processor_inputs[frame_processor_input.name] = _prepare_source_frame(swapper,source_face,source_vision_frame)
             else:
-                frame_processor_inputs[frame_processor_input.name] = swapper._prepare_source_embedding(source_face)
+                frame_processor_inputs[frame_processor_input.name] = _prepare_source_embedding(swapper.source_face)
         if frame_processor_input.name == 'target':
             frame_processor_inputs[frame_processor_input.name] = crop_vision_frame
     crop_vision_frame = frame_processor.run(None, frame_processor_inputs)[0][0]
     return crop_vision_frame
+
+def _prepare_crop_frame(swapper, crop_vision_frame : VisionFrame) -> VisionFrame:
+    model_mean = swapper._get_model_options().get('mean')
+    model_standard_deviation = swapper._get_model_options().get('standard_deviation')
+    crop_vision_frame = crop_vision_frame[:, :, ::-1] / 255.0
+    crop_vision_frame = (crop_vision_frame - model_mean) / model_standard_deviation
+    crop_vision_frame = crop_vision_frame.transpose(2, 0, 1)
+    crop_vision_frame = numpy.expand_dims(crop_vision_frame, axis = 0).astype(numpy.float32)
+    return crop_vision_frame
+
+
+def _normalize_crop_frame(crop_vision_frame : VisionFrame) -> VisionFrame:
+    crop_vision_frame = crop_vision_frame.transpose(1, 2, 0)
+    crop_vision_frame = (crop_vision_frame * 255.0).round()
+    crop_vision_frame = crop_vision_frame[:, :, ::-1]
+    return crop_vision_frame
+
+def _prepare_source_frame(swapper, source_face : Face, source_vision_frame: VisionFrame) -> VisionFrame:
+    model_type = swapper._get_model_options().get('type')
+    if model_type == 'blendswap':
+        source_vision_frame, _ = warp_face_by_face_landmark_5(source_vision_frame, source_face.landmarks.get('5/68'), 'arcface_112_v2', (112, 112))
+    if model_type == 'uniface':
+        source_vision_frame, _ = warp_face_by_face_landmark_5(source_vision_frame, source_face.landmarks.get('5/68'), 'ffhq_512', (256, 256))
+    source_vision_frame = source_vision_frame[:, :, ::-1] / 255.0
+    source_vision_frame = source_vision_frame.transpose(2, 0, 1)
+    source_vision_frame = numpy.expand_dims(source_vision_frame, axis = 0).astype(numpy.float32)
+    return source_vision_frame
+
+def _prepare_source_embedding(swapper, source_face : Face) -> Embedding:
+    model_type = swapper._get_model_options().get('type')
+    if model_type == 'inswapper':
+        model_initializer = swapper._get_model_initializer()
+        source_embedding = source_face.embedding.reshape((1, -1))
+        source_embedding = numpy.dot(source_embedding, model_initializer) / numpy.linalg.norm(source_embedding)
+    else:
+        source_embedding = source_face.normed_embedding.reshape(1, -1)
+    return source_embedding

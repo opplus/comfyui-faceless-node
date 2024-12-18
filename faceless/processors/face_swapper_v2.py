@@ -113,17 +113,11 @@ class FaceSwapperV2(FaceSwapper):
             crop_mask_list.append(occlusion_mask)
         t0 = time.time()
         pixel_boost_vision_frames = implode_pixel_boost(crop_vision_frame, pixel_boost_total, model_size)
-        exec_result = []
-        with ThreadPoolExecutor(max_workers=self._execution_thread_count) as executor:
-            futures = [
-                executor.submit(self._swap_face_2, i, source_face, source_vision_frame, pixel_boost_vision_frame)
-                for i, (pixel_boost_vision_frame) in enumerate(pixel_boost_vision_frames)
-            ]
-            # 阻塞直到所有的future完成
-            for future in concurrent.futures.as_completed(futures):
-                exec_result.append(future.result())
-        # 结果排序
-        temp_vision_frames = [x[1] for x in sorted(exec_result, key=lambda x: x[0])]
+        for pixel_boost_vision_frame in pixel_boost_vision_frames:
+            pixel_boost_vision_frame = self._prepare_crop_frame(pixel_boost_vision_frame)
+            pixel_boost_vision_frame = self._apply_swap(source_face, source_vision_frame, pixel_boost_vision_frame)
+            pixel_boost_vision_frame = self._normalize_crop_frame(pixel_boost_vision_frame)
+            temp_vision_frames.append(pixel_boost_vision_frame)
         crop_vision_frame = explode_pixel_boost(temp_vision_frames, pixel_boost_total, model_size, pixel_boost_size)
         logging.info(f"_apply_swap cost:{time.time() - t0:.2f}")
         if 'region' in self._face_mask_types:
