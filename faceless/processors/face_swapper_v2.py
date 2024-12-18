@@ -43,7 +43,7 @@ class FaceSwapperV2(FaceSwapper):
             t0 = time.time()
             source_face = get_average_face([source_frame])
             t1 = time.time()
-            print(f"swap_multi_images build source_face cost:{t1 - t0}")
+            print(f"swap_multi_images build source_face cost:{t1 - t0:.2f}")
         # 构建target_vision_frames
         target_vision_frames = []
         for (index, target_image) in enumerate(images):

@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 from typing import Optional, Any, List
@@ -213,7 +214,6 @@ class FaceSwapper:
     def _swap_face(self, source_face: Face, target_face: Face, source_vision_frame, target_vision_frame: VisionFrame,pixel_boost_size = (512,512)) -> VisionFrame:
         model_template = self._get_model_options().get('template')
         model_size = self._get_model_options().get('size')
-        # print(pixel_boost_size)
         pixel_boost_total = pixel_boost_size[0]//model_size[0]
         crop_vision_frame, affine_matrix = warp_face_by_face_landmark_5(target_vision_frame,
                                                                     target_face.landmarks.get('5/68'),
@@ -234,7 +234,7 @@ class FaceSwapper:
             pixel_boost_vision_frame = self._normalize_crop_frame(pixel_boost_vision_frame)
             temp_vision_frames.append(pixel_boost_vision_frame)
         crop_vision_frame = explode_pixel_boost(temp_vision_frames, pixel_boost_total, model_size, pixel_boost_size)
-        # print(f"_apply_swap cost:{time.time()-t0}")
+        logging.info(f"_apply_swap cost:{time.time()-t0:.2f}")
         if 'region' in self._face_mask_types:
             region_mask = create_region_mask(crop_vision_frame, self._face_mask_regions)
             crop_mask_list.append(region_mask)

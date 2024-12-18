@@ -3,6 +3,7 @@ import hashlib
 import numpy
 
 from .typing import VisionFrame, Face, FaceStore, FaceSet
+import logging
 
 FACE_STORE: FaceStore =\
 {
@@ -14,6 +15,7 @@ FACE_STORE: FaceStore =\
 def get_static_faces(vision_frame : VisionFrame) -> Optional[List[Face]]:
     frame_hash = create_frame_hash(vision_frame)
     if frame_hash in FACE_STORE['static_faces']:
+        logging.info(f'HitCahe Face Hash : {frame_hash}')
         return FACE_STORE['static_faces'][frame_hash]
     return None
 
