@@ -2,6 +2,9 @@ import concurrent
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+import cv2
+import numpy as np
+
 from .face_restoration import FaceRestoration
 from ..typing import VisionFrame
 from ..vision import tensor_to_vision_frame
@@ -37,4 +40,6 @@ class FaceRestorationV2(FaceRestoration):
         return results
 
     def _process_frame_sequence(self, idx, frame: VisionFrame):
-        return idx, self._process_frame(frame)
+        image=self._process_frame(frame)
+        image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
+        return idx, image
