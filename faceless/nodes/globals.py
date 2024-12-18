@@ -7,6 +7,7 @@ from .nodes_merge_videos import NodesMergeVideos
 from .nodes_upload_video import NodesUploadVideo
 
 from .nodes_face_swap import NodesFaceSwap
+from .nodes_face_swap_v2 import NodesFaceSwapV2
 from .nodes_face_restore import NodesFaceRestore
 from .nodes_remove_background import NodesRemoveBackground
 from .nodes_video_face_swap import NodesVideoFaceSwap
@@ -23,6 +24,7 @@ NODE_CLASS_MAPPINGS = {
     "FacelessUploadVideo": NodesUploadVideo,
 
     "FacelessFaceSwap": NodesFaceSwap,
+    "FacelessFaceSwapV2": NodesFaceSwapV2,
     "FacelessFaceRestore": NodesFaceRestore,
     "FacelessRemoveBackground": NodesRemoveBackground,
 
@@ -41,6 +43,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FacelessUploadVideo": "Upload Video",
 
     "FacelessFaceSwap": "Face Swap",
+    "FacelessFaceSwapV2": "Face Swap V2",
     "FacelessFaceRestore": "Face Restore",
     "FacelessVideoFaceSwap": "Face Swap (Video)",
     "FacelessVideoFaceRestore": "Face Restore (Video)",
