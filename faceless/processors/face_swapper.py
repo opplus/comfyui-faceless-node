@@ -234,7 +234,7 @@ class FaceSwapper:
             pixel_boost_vision_frame = self._normalize_crop_frame(pixel_boost_vision_frame)
             temp_vision_frames.append(pixel_boost_vision_frame)
         crop_vision_frame = explode_pixel_boost(temp_vision_frames, pixel_boost_total, model_size, pixel_boost_size)
-        logging.info(f"_apply_swap cost:{time.time()-t0:.2f}")
+        logging.info(f"_apply_swap size:{len(pixel_boost_vision_frames)} cost:{time.time()-t0:.2f}")
         if 'region' in self._face_mask_types:
             region_mask = create_region_mask(crop_vision_frame, self._face_mask_regions)
             crop_mask_list.append(region_mask)
@@ -264,7 +264,9 @@ class FaceSwapper:
                     frame_processor_inputs[frame_processor_input.name] = self._prepare_source_embedding(source_face)
             if frame_processor_input.name == 'target':
                 frame_processor_inputs[frame_processor_input.name] = crop_vision_frame
+        # t0=time.time()
         crop_vision_frame = frame_processor.run(None, frame_processor_inputs)[0][0]
+        # logging.info(f"frame_processor.run cost:{time.time()-t0:.2f}")
         return crop_vision_frame
 
     def _normalize_crop_frame(self, crop_vision_frame : VisionFrame) -> VisionFrame:
