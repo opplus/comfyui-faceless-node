@@ -211,7 +211,8 @@ class FaceRestoration:
         with THREAD_LOCK:
             if self._frame_processor is None:
                 model_path = get_faceless_model_path('face_restoration', self._model_name)
-                self._frame_processor = onnxruntime.InferenceSession(model_path, providers = apply_execution_provider_options())
+                providers=apply_execution_provider_options(forceCuda=True)
+                self._frame_processor = onnxruntime.InferenceSession(model_path, providers = providers)
         return self._frame_processor
 
     def _blend_frame(self, temp_vision_frame : VisionFrame, paste_vision_frame : VisionFrame) -> VisionFrame:

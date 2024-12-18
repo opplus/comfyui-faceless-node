@@ -109,7 +109,7 @@ def _swap_face(swapper, source_face: Face, target_face: Face, source_vision_fram
     # 结果排序
     temp_vision_frames = [x[1] for x in sorted(exec_result, key=lambda x: x[0])]
     crop_vision_frame = explode_pixel_boost(temp_vision_frames, pixel_boost_total, model_size, pixel_boost_size)
-    logging.info(f"_apply_swap cost:{time.time() - t0:.2f}")
+    logging.info(f"_apply_swap size:{len(pixel_boost_vision_frames)} cost:{time.time() - t0:.2f}")
     if 'region' in swapper._face_mask_types:
         region_mask = create_region_mask(crop_vision_frame, swapper._face_mask_regions)
         crop_mask_list.append(region_mask)
@@ -136,7 +136,7 @@ def _apply_swap(swapper, source_face: Face, source_vision_frame: VisionFrame,
             if model_type == 'blendswap' or model_type == 'uniface':
                 frame_processor_inputs[frame_processor_input.name] = _prepare_source_frame(swapper,source_face,source_vision_frame)
             else:
-                frame_processor_inputs[frame_processor_input.name] = _prepare_source_embedding(swapper.source_face)
+                frame_processor_inputs[frame_processor_input.name] = _prepare_source_embedding(swapper,source_face)
         if frame_processor_input.name == 'target':
             frame_processor_inputs[frame_processor_input.name] = crop_vision_frame
     crop_vision_frame = frame_processor.run(None, frame_processor_inputs)[0][0]
