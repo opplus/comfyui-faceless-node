@@ -3,7 +3,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
-
+import cv2
+import numpy as np
 from .face_swapper import FaceSwapper
 from ..processors.face_analyser import get_average_face
 from ..typing import Face, FaceSelectorMode, VisionFrame
@@ -67,4 +68,6 @@ class FaceSwapperV2(FaceSwapper):
 
     def _process_frame_squence(self, idx, source_face: Face, source_vision_frame: VisionFrame,
                                target_vision_frame: VisionFrame, pixel_boost_size=(512, 512)) -> Optional[VisionFrame]:
-        return idx, self._process_frame(source_face, source_vision_frame, target_vision_frame, pixel_boost_size)
+        image=self._process_frame(source_face, source_vision_frame, target_vision_frame, pixel_boost_size)
+        image=cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)             
+        return idx, image

@@ -42,7 +42,7 @@ class NodesFaceSwapV2:
         swapper = FaceSwapperV2(swapper_model)
         pixel_boost_size = (512, 512)
         t0 = time.time()
-        swaped_images = swapper.swap_multi_images(images, face_image[0], pixel_boost_size)
+        swaped_images = swapper.swap_multi_images(images, face_image[0], None,pixel_boost_size)
         t1 = time.time()
         logging.info(f"swap_images success cost: {t1 - t0:.2f} seconds")
         output_image = batched_pil_to_tensor(swaped_images, parallels_num_pil=4)

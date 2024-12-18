@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from PIL import Image
+import cv2
 
 
 def tensor_to_pil(image):
