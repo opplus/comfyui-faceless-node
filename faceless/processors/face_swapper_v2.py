@@ -25,22 +25,6 @@ class FaceSwapperV2(FaceSwapper):
 
     def __init__(self, model_name: str) -> None:
         super().__init__(model_name)
-        self._model_name = model_name
-
-        self._face_selector_mode: FaceSelectorMode = 'many'
-
-        self._execution_queue_count = 1
-        self._execution_thread_count = 4
-
-        self._frame_processor = None
-        self._model_initializer = None
-
-        self._face_mask_types = ['box']
-        self._face_mask_blur = 0.3
-        self._face_mask_padding = (0, 0, 0, 0)
-        self._face_mask_regions = []
-
-        self._face_selector_mode: FaceSelectorMode = 'one'
 
     def swap_multi_images(self, images, face_image, source_face: Face, pixel_boost_size=(512, 512)):
         # 支持传入已有的face_model
