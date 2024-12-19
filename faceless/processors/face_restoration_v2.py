@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
+import time
 
 from .face_restoration import FaceRestoration
 from ..typing import VisionFrame
@@ -25,6 +26,7 @@ class FaceRestorationV2(FaceRestoration):
             target_vision_frame = tensor_to_vision_frame(target_image)
             target_vision_frames.append(target_vision_frame)
         exec_result = []
+        print(f"restore_multi_images size:{len(target_vision_frames)}")
         with ThreadPoolExecutor(max_workers=self._execution_thread_count) as executor:
             futures = [
                 executor.submit(self._process_frame_sequence, i, target_vision_frame)
@@ -40,6 +42,8 @@ class FaceRestorationV2(FaceRestoration):
         return results
 
     def _process_frame_sequence(self, idx, frame: VisionFrame):
+        t0 = time.time()
         image=self._process_frame(frame)
         image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
+        logging.info(f"restore {idx} cost: {time.time() - t0:.2f} seconds")
         return idx, image
