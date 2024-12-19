@@ -1,7 +1,7 @@
 import concurrent
 import threading
 from concurrent.futures import ThreadPoolExecutor
-
+import logging
 import cv2
 import numpy as np
 import time
