@@ -151,7 +151,7 @@ class FaceRestoration:
     def _process_frame(self, frame: VisionFrame):
         # Support one face and many face mode
         faces = get_many_faces(frame)
-        target_vision_frame = None
+        target_vision_frame = frame
         for face in faces:
             target_vision_frame = self._enhance_face(face, frame)
         return target_vision_frame
