@@ -27,27 +27,29 @@ def batched_pil_to_tensor(images,parallels_num_pil=1, batch_size=64):
     if not images:
         return torch.tensor([])
 
-    # 假设所有图像转换成张量后的形状是相同的
-    sample_tensor = pil_to_tensor(images[0])
-    tensor_shape = (len(images), *sample_tensor.shape)
-
-    # 预先分配好最终的张量
-    result = torch.empty(tensor_shape, dtype=sample_tensor.dtype)
+    # 确保转换后的张量是float32类型，并获取样本张量的形状
+    sample_tensor = pil_to_tensor(images[0]).float()
+    # 创建一个列表来保存每个批次的结果
+    batches = []
 
     for i in range(0, len(images), batch_size):
         batch_images = images[i:i + batch_size]
+        # 使用列表推导式来创建当前批次的张量列表，并确保它们都是float32类型
+        batch_tensors = [pil_to_tensor(image).float() for image in batch_images]
 
-        # 使用列表推导式来创建当前批次的张量列表
-        batch_tensors = [pil_to_tensor(image) for image in batch_images]
-
-        # 将当前批次的张量堆叠起来
-        batch_tensor = torch.stack(batch_tensors, dim=0)
-
-        # 直接写入预先分配好的张量中，保证顺序
-        result[i:i + len(batch_tensor)] = batch_tensor
+        # 如果批次不为空，则拼接当前批次的张量
+        batch_tensor = torch.cat(batch_tensors, dim=0) if len(batch_tensors) > 1 else batch_tensors[0].unsqueeze(0)
+        batches.append(batch_tensor)
 
         # 清理不再需要的对象以释放内存
-        del batch_tensors, batch_tensor
+        del batch_tensors
+
+    # 拼接所有的批次，保证顺序
+    result = torch.cat(batches, dim=0) if batches else torch.empty((0, *sample_tensor.shape), dtype=torch.float32)
+
+    # 检查并调整形状以移除不必要的维度
+    if result.dim() > 4:
+        result = result.squeeze(1)  # 如果有额外的维度，尝试移除它
 
     return result
 
