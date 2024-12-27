@@ -19,7 +19,6 @@ class NodesFaceRestoreV2:
         }
 
     CATEGORY = "faceless"
-    RETURN_TYPES = ()
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("IMAGE",)
     FUNCTION = "restoreFace"
@@ -30,7 +29,7 @@ class NodesFaceRestoreV2:
         result_images = face_restoration.restore_multi_images(images)
         t1 = time.time()
         logging.info(f"restore_multi_images success cost: {t1 - t0:.2f} seconds")
-        output_image = batched_pil_to_tensor(result_images, parallels_num_pil=4)
+        output_image = batched_pil_to_tensor(result_images, parallels_num_pil=1)
         t2 = time.time()
         logging.info(f"batched_pil_to_tensor success cost: {t2 - t1:.2f} seconds")
         del face_restoration
